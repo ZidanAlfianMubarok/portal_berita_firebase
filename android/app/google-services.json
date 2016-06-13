@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "293735256886",
+    "project_id": "portal-news-app-c731a",
+    "storage_bucket": "portal-news-app-c731a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:293735256886:android:4b68130f8b46fb34705997",
+        "android_client_info": {
+          "package_name": "com.portalnews.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB_6PrSwJUlkThDqa2Vc_oOh-4ouaKaUtI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
