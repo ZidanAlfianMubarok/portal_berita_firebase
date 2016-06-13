@@ -18,6 +18,13 @@ class _HomeScreenState extends State<HomeScreen> {
   final _authService = AuthService();
   final _firestoreService = FirestoreService();
   User? _currentUser;
+  int _selectedIndex = 0;
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
 
   @override
   void initState() {
@@ -193,215 +200,392 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Portal News'),
-        actions: [
-          if (_currentUser == null)
-            TextButton.icon(
-              onPressed: () {
-                Navigator.of(context)
-                    .push(
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                )
-                    .then((_) {
-                  setState(() {
-                    _currentUser = _authService.currentUser;
-                  });
-                });
-              },
-              icon: const Icon(Icons.login),
-              label: const Text('Login'),
-              style: TextButton.styleFrom(foregroundColor: Colors.deepPurple),
-            )
-          else
-            IconButton(
-              icon: const Icon(Icons.person),
-              onPressed: () {
-                Navigator.of(context)
-                    .push(
-                  MaterialPageRoute(
-                      builder: (context) => const ProfileScreen()),
-                )
-                    .then((_) {
-                  setState(() {
-                    _currentUser = _authService.currentUser;
-                  });
-                });
-              },
-            ),
-          if (_currentUser != null)
-            IconButton(
-              icon: const Icon(Icons.logout),
-              onPressed: () async {
-                await _authService.signOut();
-                if (mounted) {
-                  setState(() {
-                    _currentUser = _authService.currentUser;
-                  });
-                  ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Logged out')));
-                }
-              },
-            ),
-        ],
-      ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16.0),
+  Widget _buildNewsFeed() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16.0),
+          decoration: BoxDecoration(
             color: Colors.deepPurple.shade50,
-            width: double.infinity,
-            child: Text(
-              _currentUser != null
-                  ? 'Hello, ${_currentUser?.displayName ?? 'User'}!'
-                  : 'Welcome Guest',
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.deepPurple,
-              ),
-            ),
+            borderRadius:
+                const BorderRadius.vertical(bottom: Radius.circular(20)),
           ),
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: _firestoreService.getNews(),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return const Center(
-                      child: Text('Something went wrong. check permissions?'));
-                }
+          width: double.infinity,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _currentUser != null
+                    ? 'Hello, ${_currentUser?.displayName ?? 'User'}!'
+                    : 'Welcome Guest',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.deepPurple,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _currentUser != null
+                    ? 'Here is your daily news'
+                    : 'Login to create news',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: _firestoreService.getNews(),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return const Center(
+                    child: Text('Something went wrong. check permissions?'));
+              }
 
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-                final data = snapshot.requireData;
+              final data = snapshot.requireData;
 
-                if (data.size == 0) {
-                  return const Center(child: Text('No news yet.'));
-                }
+              if (data.size == 0) {
+                return const Center(child: Text('No news yet.'));
+              }
 
-                return ListView.builder(
-                  itemCount: data.size,
-                  itemBuilder: (context, index) {
-                    var news = data.docs[index];
-                    var newsData = news.data() as Map<String, dynamic>;
+              return ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: data.size,
+                itemBuilder: (context, index) {
+                  var news = data.docs[index];
+                  var newsData = news.data() as Map<String, dynamic>;
 
-                    // Check if current user is author
-                    bool isAuthor = _currentUser != null &&
-                        newsData.containsKey('uid') &&
-                        newsData['uid'] == _currentUser!.uid;
+                  // Check if current user is author
+                  bool isAuthor = _currentUser != null &&
+                      newsData.containsKey('uid') &&
+                      newsData['uid'] == _currentUser!.uid;
 
-                    return Card(
-                      margin: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      child: InkWell(
-                        onTap: () {
-                          Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => NewsDetailScreen(
-                                      newsId: news.id, newsData: newsData)));
-                        },
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Stack(
-                              children: [
-                                if (newsData['imageUrl'] != null &&
-                                    (newsData['imageUrl'] as String).isNotEmpty)
-                                  ClipRRect(
-                                    borderRadius: const BorderRadius.vertical(
-                                        top: Radius.circular(12)),
-                                    child: Image.network(
-                                      newsData['imageUrl'],
-                                      height: 150,
-                                      width: double.infinity,
-                                      fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) =>
-                                              const SizedBox(
-                                                  height: 150,
-                                                  child: Center(
-                                                      child: Icon(
-                                                          Icons.broken_image))),
+                  return Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () {
+                        Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => NewsDetailScreen(
+                                    newsId: news.id, newsData: newsData)));
+                      },
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Stack(
+                            children: [
+                              ClipRRect(
+                                borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(16)),
+                                child: (newsData['imageUrl'] != null &&
+                                        (newsData['imageUrl'] as String)
+                                            .isNotEmpty)
+                                    ? Image.network(
+                                        newsData['imageUrl'],
+                                        height: 180,
+                                        width: double.infinity,
+                                        fit: BoxFit.cover,
+                                        errorBuilder:
+                                            (context, error, stackTrace) =>
+                                                Container(
+                                          height: 180,
+                                          color: Colors.grey[200],
+                                          child: const Center(
+                                              child: Icon(Icons.broken_image,
+                                                  size: 40,
+                                                  color: Colors.grey)),
+                                        ),
+                                      )
+                                    : Container(
+                                        height: 180,
+                                        color: Colors.deepPurple.shade100,
+                                        child: const Center(
+                                            child: Icon(Icons.newspaper,
+                                                size: 60,
+                                                color: Colors.deepPurple)),
+                                      ),
+                              ),
+                              if (isAuthor)
+                                Positioned(
+                                  top: 8,
+                                  right: 8,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.1),
+                                          blurRadius: 4,
+                                        )
+                                      ],
+                                    ),
+                                    child: PopupMenuButton<String>(
+                                      icon: const Icon(Icons.more_vert,
+                                          color: Colors.black),
+                                      onSelected: (value) {
+                                        if (value == 'edit') {
+                                          _handleEdit(
+                                              news.id,
+                                              newsData['title'] ?? '',
+                                              newsData['content'] ?? '');
+                                        } else if (value == 'delete') {
+                                          _handleDelete(news.id);
+                                        }
+                                      },
+                                      itemBuilder: (context) => [
+                                        const PopupMenuItem(
+                                          value: 'edit',
+                                          child: ListTile(
+                                            leading: Icon(Icons.edit),
+                                            title: Text('Edit'),
+                                            contentPadding: EdgeInsets.zero,
+                                          ),
+                                        ),
+                                        const PopupMenuItem(
+                                          value: 'delete',
+                                          child: ListTile(
+                                            leading: Icon(Icons.delete,
+                                                color: Colors.red),
+                                            title: Text('Delete',
+                                                style: TextStyle(
+                                                    color: Colors.red)),
+                                            contentPadding: EdgeInsets.zero,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                if (isAuthor)
-                                  Positioned(
-                                    top: 8,
-                                    right: 8,
-                                    child: CircleAvatar(
-                                      backgroundColor: Colors.white,
-                                      child: PopupMenuButton<String>(
-                                        icon: const Icon(Icons.more_vert,
-                                            color: Colors.black),
-                                        onSelected: (value) {
-                                          if (value == 'edit') {
-                                            _handleEdit(
-                                                news.id,
-                                                newsData['title'] ?? '',
-                                                newsData['content'] ?? '');
-                                          } else if (value == 'delete') {
-                                            _handleDelete(news.id);
-                                          }
-                                        },
-                                        itemBuilder: (context) => [
-                                          const PopupMenuItem(
-                                            value: 'edit',
-                                            child: ListTile(
-                                              leading: Icon(Icons.edit),
-                                              title: Text('Edit'),
-                                              contentPadding: EdgeInsets.zero,
-                                            ),
-                                          ),
-                                          const PopupMenuItem(
-                                            value: 'delete',
-                                            child: ListTile(
-                                              leading: Icon(Icons.delete,
-                                                  color: Colors.red),
-                                              title: Text('Delete',
-                                                  style: TextStyle(
-                                                      color: Colors.red)),
-                                              contentPadding: EdgeInsets.zero,
-                                            ),
-                                          ),
-                                        ],
+                                ),
+                            ],
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  news['title'],
+                                  style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  news['content'],
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(color: Colors.grey[600]),
+                                ),
+                                const SizedBox(height: 12),
+                                if (newsData.containsKey('authorName'))
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.person_outline,
+                                          size: 16, color: Colors.deepPurple),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '${newsData['authorName']}',
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.deepPurple[400],
+                                            fontWeight: FontWeight.w500),
                                       ),
-                                    ),
+                                    ],
                                   ),
                               ],
                             ),
-                            ListTile(
-                              title: Text(
-                                news['title'],
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold),
-                              ),
-                              subtitle: Text(
-                                news['content'],
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    );
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSettings() {
+    return ListView(
+      padding: const EdgeInsets.all(16.0),
+      children: [
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8.0),
+          child: Text(
+            'General',
+            style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.deepPurple),
+          ),
+        ),
+        Card(
+          elevation: 2,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Column(
+            children: [
+              SwitchListTile(
+                value: true,
+                onChanged: (val) {},
+                title: const Text('Notifications'),
+                activeColor: Colors.deepPurple,
+              ),
+              const Divider(height: 1),
+              SwitchListTile(
+                value: false,
+                onChanged: (val) {},
+                title: const Text('Dark Mode'),
+                activeColor: Colors.deepPurple,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8.0),
+          child: Text(
+            'Support',
+            style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.deepPurple),
+          ),
+        ),
+        Card(
+          elevation: 2,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Column(
+            children: [
+              ListTile(
+                leading:
+                    const Icon(Icons.help_outline, color: Colors.deepPurple),
+                title: const Text('Help & Support'),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () {},
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading:
+                    const Icon(Icons.info_outline, color: Colors.deepPurple),
+                title: const Text('About App'),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () {},
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Widget currentWidget;
+    switch (_selectedIndex) {
+      case 0:
+        currentWidget = _buildNewsFeed();
+        break;
+      case 1:
+        currentWidget = _buildSettings();
+        break;
+      case 2:
+        if (_currentUser != null) {
+          currentWidget = const ProfileScreen();
+        } else {
+          currentWidget = Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.lock_outline,
+                    size: 64, color: Colors.deepPurple),
+                const SizedBox(height: 16),
+                const Text('Please login to view profile'),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context)
+                        .push(
+                      MaterialPageRoute(
+                          builder: (context) => const LoginScreen()),
+                    )
+                        .then((_) {
+                      setState(() {
+                        _currentUser = _authService.currentUser;
+                      });
+                    });
                   },
-                );
-              },
+                  icon: const Icon(Icons.login),
+                  label: const Text('Login'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepPurple,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ],
             ),
+          );
+        }
+        break;
+      default:
+        currentWidget = _buildNewsFeed();
+    }
+
+    return Scaffold(
+      appBar: _selectedIndex == 0
+          ? AppBar(
+              title: const Text('Portal News',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+              backgroundColor: Colors.deepPurple.shade50,
+              elevation: 0,
+            )
+          : null,
+      body: currentWidget,
+      floatingActionButton: _selectedIndex == 0
+          ? FloatingActionButton(
+              onPressed: _handleAddNews,
+              backgroundColor: Colors.deepPurple,
+              child: const Icon(Icons.add, color: Colors.white),
+            )
+          : null,
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _selectedIndex,
+        onDestinationSelected: _onItemTapped,
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.newspaper),
+            label: 'Home',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.settings),
+            label: 'Settings',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person),
+            label: 'Profile',
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _handleAddNews,
-        child: const Icon(Icons.add),
       ),
     );
   }
